@@ -63,7 +63,7 @@ pip install django djangorestframework drf-spectacular pytest-drf
 django-admin startproject myproject .
 
 # Buat app
-python manage.py startapp api
+python manage.py startapp belajar
 
 ```
 
@@ -85,7 +85,7 @@ INSTALLED_APPS = [
     ...
     'rest_framework',
     'drf_spectacular',
-    'api',  # tambahkan app kita
+    'belajar',  # tambahkan app
 ]
 
 REST_FRAMEWORK = {
@@ -113,7 +113,7 @@ from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('', include('api.urls')),  # include url dari app api
+    path('', include('belajar.urls')),  # include url dari app belajar
     path('schema/', SpectacularAPIView.as_view(), name='schema'),  # openapi schema
     path('docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),  # swagger ui
 ]
