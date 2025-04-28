@@ -2,11 +2,13 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from .serializers import HaloSerializer
+from drf_spectacular.utils import extend_schema
 
 class HaloView(APIView):
     def get(self, request):
         return Response({"message": "Belajar DRF"}, status=status.HTTP_200_OK)
 
+    @extend_schema(request=HaloSerializer)
     def post(self, request):
         serializer = HaloSerializer(data=request.data)
         if serializer.is_valid():
