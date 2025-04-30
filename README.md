@@ -300,14 +300,64 @@ myproject/
 
 #### 3.3 Create manual tabel dengan SQL
 
+- DATABASE ORM 
+
+>> jika menggunakan ORM pakailah langkah dibawah
+
+Secara default, Django akan membuat nama tabel di database berdasarkan nama aplikasi dan nama model dengan format:
+`<nama_aplikasi>_<nama_model>`
+
+```py
+#/siswa/model.py
+from django.db import models
+
+class Products(models.Model):
+    prod_name = models.CharField(max_length=100)
+    price = models.CharField(max_length=15)
+
+    class Meta:
+        db_table = "tb_products"  # Menentukan nama tabel di SQLite
+
+```
+
+```py
+python3 manage.py makemigrations
+python3 manage.py migrate
+```
+
+CEK DATA
+
+```py
+python manage.py dbshell
+
+.tables
+```
+
+- DATABASE NO ORM
+
+>> jika tidak menggunakan ORM pakailah langkah dibawah
+
+```py
+python3 manage.py dbshell
+```
+
 ```sql
+-- create tabel
 CREATE TABLE tb_products (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL,
+    prod_name TEXT NOT NULL,
     price REAL NOT NULL
 );
 
+
+
+-- mengetahui semua tabel yang ada
+.tables 
+
+-- melihat struktur tabel
+PRAGMA table_info(tbl_customer); 
 ```
+
 
 #### 3.4 Setting Django (myproject/settings.py)
 
