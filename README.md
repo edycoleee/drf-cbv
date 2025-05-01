@@ -1,3 +1,15 @@
+## TEKNOLOGI YANG DIPELAJARI DRF CBV
+- venv >> virtual environtment
+- Default Router >> list,create,update,destroy
+- Serializer Input dan Output >> validation
+- APIView >> req-validation-proses-response
+- async function, try catch >> get API from others
+- Services >> Raw SQL Operation
+- Utils >> db.py, response wrapper, custom exception 
+- drf-spectacular >> extend schema >> schema open api documentation
+- pytest-django >> unit test terstruktur
+- docker >> deploy server
+
 ### 1. GITHUB
 
 ```cmd
@@ -273,6 +285,13 @@ retrieve(self, request, pk=None)	Mengambil detail objek tertentu berdasarkan pk
 update(self, request, pk=None)	    Melakukan update penuh (PUT) terhadap objek
 partial_update(self, request, pk=None)	Update sebagian (PATCH) terhadap objek
 destroy(self, request, pk=None)	        Menghapus objek
+
+Ketika kamu menggunakan DefaultRouter, nama-nama URL akan otomatis dibuat berdasarkan pola:
+router.register('product', ProductViewSet, basename='product-url')
+
+Nama untuk endpoint list adalah: 'product-url-list'
+Nama untuk endpoint detail adalah: 'product-url-detail'
+url = reverse('product-url-list') >> auto definde pada reverse
 
 ```
 
