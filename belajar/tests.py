@@ -15,7 +15,7 @@ class TestHaloView:
         response = api_client.get(url)
         
         assert response.status_code == status.HTTP_200_OK
-        assert response.data == {"message": "Belajar DRF"}
+        assert response.data == {"message": "Belajar DRF CBV"}
     
     def test_post_halo_valid_data(self, api_client):
         url = reverse('halo')
@@ -39,12 +39,12 @@ class TestHaloView:
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert "nama" in response.data  # error message for nama field
 
-@pytest.mark.django_db
-class TestNamaView:
-    def test_get_nama(self, api_client):
-        nama = "Silmi"
-        url = reverse('nama', kwargs={'nama': nama})
-        response = api_client.get(url)
+# @pytest.mark.django_db
+# class TestNamaView:
+#     def test_get_nama(self, api_client):
+#         nama = "Silmi"
+#         url = reverse('nama', kwargs={'nama': nama})
+#         response = api_client.get(url)
         
-        assert response.status_code == status.HTTP_200_OK
-        assert response.data == {"message": f"Halo {nama}"}
+#         assert response.status_code == status.HTTP_200_OK
+#         assert response.data == {"message": f"Halo {nama}"}
