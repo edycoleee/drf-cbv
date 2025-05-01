@@ -62,7 +62,7 @@ pip install django djangorestframework drf-spectacular pytest-drf
 # Start Django project
 django-admin startproject myproject .
 
-# Buat app
+# Buat app bernama "belajar"
 python manage.py startapp belajar
 
 ```
@@ -116,13 +116,13 @@ urlpatterns = [
 #### 2.5 URL App (belajar/urls.py)
 
 ```py
+# belajar/urls.py
 from django.urls import path
 from .views import HaloView, NamaView
 
 urlpatterns = [
-    path('halo', HaloView.as_view(), name='halo-get'),
-    path('halo', HaloView.as_view(), name='halo-post'),  # sama endpoint, beda method
-    path('nama/<str:nama>', NamaView.as_view(), name='nama-get'),
+    path('halo', HaloView.as_view(), name='halo'), # URL untuk endpoint halo
+    path('nama/<str:nama>', NamaView.as_view(), name='nama'),# URL untuk endpoint nama
 ]
 
 ```
@@ -130,11 +130,16 @@ urlpatterns = [
 #### 2.6 Serializer In/Out {belajar/serializers.py}
 
 ```py
+# belajar/serializers.py
 from rest_framework import serializers
+#Serializer untuk input Halo
+class HaloInputSerializer(serializers.Serializer):
+    nama = serializers.CharField()
+    alamat = serializers.CharField()
 
-class HaloSerializer(serializers.Serializer):
-    nama = serializers.CharField(max_length=100)
-    alamat = serializers.CharField(max_length=200)
+#Serializer Input dan Output untuk Message
+class MessageResponseSerializer(serializers.Serializer):
+    message = serializers.CharField()
 
 ```
 
@@ -143,29 +148,42 @@ class HaloSerializer(serializers.Serializer):
 Tapi di Django, kalau method GET dan POST endpoint-nya sama (/halo), lebih baik gabung dalam satu view. Jadi kita perbaiki nanti di views.py.
 
 ```py
+from django.shortcuts import render
+
+# Create your views here.
+# belajar/views.py
+
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from .serializers import HaloSerializer
+from .serializers import HaloInputSerializer, MessageResponseSerializer
+from drf_spectacular.utils import extend_schema
 
 class HaloView(APIView):
+    @extend_schema(
+        responses=MessageResponseSerializer
+    )
     def get(self, request):
-        return Response({"message": "Belajar DRF"}, status=status.HTTP_200_OK)
-
+        return Response({"message": "Belajar DRF CBV"}, status=status.HTTP_200_OK)
+    #Schema untuk request dan response >> apenAPI
+    @extend_schema(
+        request=HaloInputSerializer,
+        responses=HaloInputSerializer
+    )
     def post(self, request):
-        serializer = HaloSerializer(data=request.data)
+        # Serializer untuk validasi input
+        serializer = HaloInputSerializer(data=request.data)
         if serializer.is_valid():
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
+            return Response(serializer.data, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 class NamaView(APIView):
-    def get(self, request, nama=None):
-        if not nama:
-            return Response(
-                {"error": "Nama tidak diberikan."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+    @extend_schema(
+        responses=MessageResponseSerializer
+    )
+    def get(self, request, nama):
         return Response({"message": f"Halo {nama}"}, status=status.HTTP_200_OK)
+
 ```
 
 Migrasi dan Jalankan Server
@@ -175,7 +193,7 @@ python manage.py migrate
 python manage.py runserver
 ```
 
-#### 2.8 Unit Test (belajar/test_belajar.py) pakai pytest-drf
+#### 2.8 Unit Test (belajar/test.py) pakai pytest-drf
 
 ```py
 import pytest

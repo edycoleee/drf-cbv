@@ -15,12 +15,13 @@ class HaloView(APIView):
     )
     def get(self, request):
         return Response({"message": "Belajar DRF CBV"}, status=status.HTTP_200_OK)
-
+    #Schema untuk request dan response >> apenAPI
     @extend_schema(
         request=HaloInputSerializer,
         responses=HaloInputSerializer
     )
     def post(self, request):
+        # Serializer untuk validasi input
         serializer = HaloInputSerializer(data=request.data)
         if serializer.is_valid():
             return Response(serializer.data, status=status.HTTP_200_OK)
