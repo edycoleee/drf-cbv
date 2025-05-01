@@ -40,6 +40,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'drf_spectacular',
     'belajar',  # tambahkan app
+    'product',  # tambahkan app
 ]
 
 REST_FRAMEWORK = {

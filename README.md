@@ -56,7 +56,7 @@ venv\Scripts\activate
 # Mac/Linux:
 source venv/bin/activate
 
-# Install Django dan Django REST Framework + drf-spectacular(Swagger) + pytest-drf(Testing)
+# Install Django dan Django REST Framework + drf-spectacular(Swagger) + pytest-django(Testing)
 pip install django djangorestframework pytest pytest-django drf-spectacular
 
 # Start Django project
@@ -306,14 +306,14 @@ venv\Scripts\activate
 # Mac/Linux:
 source venv/bin/activate
 
-# Install Django dan Django REST Framework + drf-spectacular(Swagger) + pytest-drf(Testing)
-pip install django djangorestframework drf-spectacular pytest-drf
+# Install Django dan Django REST Framework + drf-spectacular(Swagger) + pytest-django(Testing)
+pip install django djangorestframework pytest pytest-django drf-spectacular
 
 # Start Django project
 #django-admin startproject myproject .
 
 # Buat app
-#python manage.py startapp api
+python manage.py startapp products
 
 ```
 
@@ -321,21 +321,21 @@ pip install django djangorestframework drf-spectacular pytest-drf
 myproject/
   ├── settings.py
   ├── urls.py
-  ├── belajar/
-        ├── views.py
-        ├── urls.py
-        ├── test_belajar.py
-  ├── products/
-        ├── views.py          # <== Method Request >> Response
-        ├── urls.py
-        ├── test_products.py
-        ├── serializer.py     # <== Validation Request
-        ├── service.py        # <== Raw SQL
-        ├── schema.py         # <== Documentation Schema
   ├── utils/
         ├── db.py
         ├── response_wrapper.py
         ├── custom_exception.py
+  ├── belajar/
+        ├── views.py
+        ├── urls.py
+        ├── tests.py
+  ├── productss/
+        ├── views.py          # <== Method Request >> Response
+        ├── urls.py
+        ├── tests.py
+        ├── serializer.py     # <== Validation Request
+        ├── service.py        # <== Raw SQL
+        ├── schema.py         # <== Documentation Schema
 ```
 
 #### 3.3 Create manual tabel dengan SQL
@@ -397,7 +397,7 @@ CREATE TABLE tb_products (
 -- melihat struktur tabel
 PRAGMA table_info(tbl_customer); 
 ```
-
+CTRL + D >> keluar dari dbshell
 
 #### 3.4 Setting Django (myproject/settings.py)
 
@@ -405,8 +405,7 @@ PRAGMA table_info(tbl_customer);
 
 INSTALLED_APPS = [
     ...
-    'rest_framework',
-    'api',
+    'product',
 ]
 
 DATABASES = {
@@ -434,10 +433,11 @@ SPECTACULAR_SETTINGS = {
 response_wrapper.py
 
 ```py
-def success_response(data):
+def success_response(message=None, data=None, status="success"):
     return {
-        "status": "success",
-        "data": data
+        "status": status,
+        "message": message,
+        "data": data if data is not None else {}
     }
 
 ```
@@ -445,12 +445,21 @@ def success_response(data):
 custom_exception.py
 
 ```py
+from rest_framework.views import exception_handler as drf_exception_handler
 from rest_framework.exceptions import APIException
+from rest_framework import status
+from myproject.utils.response_wrapper import success_response
 
 class NotFoundException(APIException):
-    status_code = 404
-    default_detail = 'Not found.'
+    status_code = status.HTTP_404_NOT_FOUND
+    default_detail = 'Not found'
     default_code = 'not_found'
+
+def custom_exception_handler(exc, context):
+    response = drf_exception_handler(exc, context)
+    if response is not None:
+        response.data = success_response(status='error', data=None, message=str(exc))
+    return response
 
 ```
 
