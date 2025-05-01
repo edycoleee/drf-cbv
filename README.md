@@ -14,7 +14,7 @@ git push -u origin main
 
 #### 2.1 API SPECS
 
-GET http://127.0.0.1:8000/halo Response: { "message": "Belajar DRF" }
+GET http://127.0.0.1:8000/halo Response: { "message": "Belajar DRF CBV" }
 
 GET http://127.0.0.1:8000/nama/Silmi Response: { "message": "Halo Silmi" }
 
@@ -57,7 +57,7 @@ venv\Scripts\activate
 source venv/bin/activate
 
 # Install Django dan Django REST Framework + drf-spectacular(Swagger) + pytest-drf(Testing)
-pip install django djangorestframework drf-spectacular pytest-drf
+pip install django djangorestframework pytest pytest-django drf-spectacular
 
 # Start Django project
 django-admin startproject myproject .
@@ -184,6 +184,7 @@ class NamaView(APIView):
     def get(self, request, nama):
         return Response({"message": f"Halo {nama}"}, status=status.HTTP_200_OK)
 
+
 ```
 
 Migrasi dan Jalankan Server
@@ -196,56 +197,53 @@ python manage.py runserver
 #### 2.8 Unit Test (belajar/test.py) pakai pytest-drf
 
 ```py
-import pytest
-from pytest_drf import APIClientFixture, ViewTest
-from pytest_drf.util import url_for
+# pytest.ini sejajar dengan manage.py
+[pytest]
+DJANGO_SETTINGS_MODULE = myproject.settings #Folder utama.settings
+python_files = tests.py test_*.py *_tests.py
+```
 
-client = APIClientFixture()
+```py
+# belajar/tests.py
+import pytest
+from django.urls import reverse
+from rest_framework import status
+from rest_framework.test import APIClient
+
+@pytest.fixture
+def api_client():
+    return APIClient()
 
 @pytest.mark.django_db
-class TestHaloView(ViewTest):
-    client = client
-
-    def test_get_halo(self):
-        response = self.client.get(url_for('halo-get'))
-
-        assert response.status_code == 200
-        assert response.data == {"message": "Belajar DRF"}
-
-    def test_post_halo_success(self):
+class TestHaloView:
+    def test_get_halo(self, api_client):
+        url = reverse('halo')
+        response = api_client.get(url)
+        
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data == {"message": "Belajar DRF CBV"}
+    
+    def test_post_halo_valid_data(self, api_client):
+        url = reverse('halo')
         data = {
             "nama": "Silmi",
             "alamat": "Semarang"
         }
-        response = self.client.post(url_for('halo-get'), data, format='json')
-
-        assert response.status_code == 201
+        response = api_client.post(url, data, format='json')
+        
+        assert response.status_code == status.HTTP_200_OK
         assert response.data == data
-
-    def test_post_halo_nama_kosong(self):
+    
+    def test_post_halo_invalid_data(self, api_client):
+        url = reverse('halo')
         data = {
-            "nama": "",
+            "nama": "",  # invalid - empty string
             "alamat": "Semarang"
         }
-        response = self.client.post(url_for('halo-get'), data, format='json')
-
-        assert response.status_code == 400
-        assert "nama" in response.data
-
-@pytest.mark.django_db
-class TestNamaView(ViewTest):
-    client = client
-
-    def test_get_nama_success(self):
-        response = self.client.get(url_for('nama-get', nama="Silmi"))
-
-        assert response.status_code == 200
-        assert response.data == {"message": "Halo Silmi"}
-
-    def test_get_nama_tanpa_parameter(self):
-        # Coba akses endpoint tanpa nama
-        response = self.client.get('/nama/')  # langsung URL
-        assert response.status_code == 404
+        response = api_client.post(url, data, format='json')
+        
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "nama" in response.data  # error message for nama field
 ```
 
 Jalankan Test `pytest`
@@ -253,6 +251,30 @@ Jalankan Test `pytest`
 #### 2.9 Unit Test (request.rest) / Postman
 
 ### 3. API PRODUCT
+
+Dalam Django REST Framework (DRF), ViewSet adalah class-based view (CBV) tingkat tinggi yang menyederhanakan penulisan endpoint RESTful untuk model, seperti Product. ViewSet secara otomatis menghubungkan method HTTP (GET, POST, PUT, DELETE) dengan method dalam class seperti list, create, retrieve, update, dan destroy.
+```
+Contoh API: Product
+Misal kamu punya model Product dan ingin membuat endpoint seperti:
+
+Endpoint	    HTTP	Method      ViewSet	Fungsi
+/products/	    GET	    list	    Mengambil semua produk
+/products/	    POST	create	    Menambahkan produk baru
+/products/{id}/	GET	    retrieve	Mengambil detail produk tertentu
+/products/{id}/	PUT	    update	    Update penuh produk
+/products/{id}/	PATCH	partial_update	Update sebagian produk
+/products/{id}/	DELETE	destroy	    Menghapus produk
+
+Penjelasan Method di ViewSet
+Method	                            Kegunaan
+list(self, request)	                Mengembalikan daftar semua objek
+create(self, request)	            Membuat objek baru dari data request
+retrieve(self, request, pk=None)	Mengambil detail objek tertentu berdasarkan pk
+update(self, request, pk=None)	    Melakukan update penuh (PUT) terhadap objek
+partial_update(self, request, pk=None)	Update sebagian (PATCH) terhadap objek
+destroy(self, request, pk=None)	        Menghapus objek
+
+```
 
 #### 3.1 API SPECS
 
