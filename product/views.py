@@ -1,4 +1,4 @@
-
+#product/views.py
 from rest_framework import viewsets, status
 from rest_framework.response import Response
 from myproject.utils.response_wrapper import success_response
@@ -10,20 +10,16 @@ class ProductViewSet(viewsets.ViewSet):
 
     @product_list_schema
     def list(self, request):
-        products = {
-            "products": [
+        products = [
                 {
                     "id": 1,
-                    "name": "Product 1",
+                    "prod_name": "Product 1",
                     "price": 10.0,
-                    "description": "Description of Product 1",
                 },
                 {
                     "id": 2,
-                    "name": "Product 2",
+                    "prod_name": "Product 2",
                     "price": 20.0,
-                    "description": "Description of Product 2",
                 },
             ]
-        }
-        return Response(success_response(products))
+        return Response(success_response("GET ALL PRODUCTS",products))

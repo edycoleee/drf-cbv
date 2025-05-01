@@ -3,6 +3,6 @@ from product.views import ProductViewSet
 
 
 router = DefaultRouter()
-router.register('product', ProductViewSet, basename='product')
+router.register('product', ProductViewSet, basename='product-url')
 
 urlpatterns = router.urls

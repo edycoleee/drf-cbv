@@ -1,3 +1,4 @@
+#product/schemas.py
 from drf_spectacular.utils import extend_schema, OpenApiExample
 from product.serializers import ProductOutputSerializer
 

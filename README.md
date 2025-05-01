@@ -509,14 +509,18 @@ class DictCursor:
 #### 3.6 URL utama (myproject/urls.py)
 
 ```py
+from django.contrib import admin
+from django.urls import path, include
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('', include('api.urls')),
-    path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
-    path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
+    path('', include('belajar.urls')),  # include url dari app belajar
+    path('', include('product.urls')),  # include url dari app products
+    path('schema/', SpectacularAPIView.as_view(), name='schema'),  # openapi schema
+    path('docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),  # swagger ui
 ]
+
 
 ```
 
@@ -524,10 +528,11 @@ urlpatterns = [
 
 ```py
 from rest_framework.routers import DefaultRouter
-from api.views.products_view import ProductViewSet
+from product.views import ProductViewSet
+
 
 router = DefaultRouter()
-router.register('products', ProductViewSet, basename='products')
+router.register('product', ProductViewSet, basename='product-url')
 
 urlpatterns = router.urls
 
@@ -536,14 +541,151 @@ urlpatterns = router.urls
 #### 3.8 Serializer In/Out (api/serializers.py)
 
 ```py
+#/product/serializer.py >>validation dan swagger input
 from rest_framework import serializers
 
-class ProductSerializer(serializers.Serializer):
-    id = serializers.IntegerField(read_only=True)
-    name = serializers.CharField(max_length=255)
+class ProductInputSerializer(serializers.Serializer):
+    prod_name = serializers.CharField()
+    price = serializers.FloatField()
+
+class ProductOutputSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    prod_name = serializers.CharField()
     price = serializers.FloatField()
 
 ```
+
+
+#### 3.9 Membuat Response yang mudah
+
+GET /product >> data statid
+```json
+{
+  "status": "success",
+  "message": "GET ALL PRODUCTS",
+  "data": [
+    {
+      "id": 1,
+      "prod_name": "Product 1",
+      "price": 10
+    },
+    {
+      "id": 2,
+      "prod_name": "Product 2",
+      "price": 20
+    }
+  ]
+}
+```
+Mari Kita Implementasikan :
+
+```py 
+#### serializer.py >> tentukan input req dan output res >> lihat atas
+
+#### views.py >> buat req response sederhana seperti api specs
+#product/views.py
+from rest_framework import viewsets, status
+from rest_framework.response import Response
+from myproject.utils.response_wrapper import success_response
+from product.schemas import (
+    product_list_schema,
+)
+
+class ProductViewSet(viewsets.ViewSet):
+
+    @product_list_schema
+    def list(self, request):
+        products = [
+                {
+                    "id": 1,
+                    "prod_name": "Product 1",
+                    "price": 10.0,
+                },
+                {
+                    "id": 2,
+                    "prod_name": "Product 2",
+                    "price": 20.0,
+                },
+            ]
+        return Response(success_response("GET ALL PRODUCTS",products))
+
+
+#### urls.py Utama >> register urls product >> lihat atas
+#### urls.py product >> rambil views >> lihat atas
+
+#### schemas.py >> documentation
+#product/schemas.py
+from drf_spectacular.utils import extend_schema, OpenApiExample
+from product.serializers import ProductOutputSerializer
+
+# Example Object (bisa reusable)
+product_example = OpenApiExample(
+    'Product Example',
+    value={
+        "id": 1,
+        "prod_name": "Produk Contoh",
+        "price": 10000.0
+    },
+    request_only=False,  # tampil di response
+    response_only=False, # tampil di request
+)
+
+# List Products
+product_list_schema = extend_schema(
+    responses=ProductOutputSerializer(many=True),
+    summary="List all products",
+    description="Retrieve a list of all products.",
+    examples=[product_example],
+)
+
+#### unit test product
+# product/tests.py
+import pytest
+from django.urls import reverse
+from rest_framework import status
+from rest_framework.test import APIClient
+
+@pytest.fixture
+def api_client():
+    return APIClient()
+
+@pytest.mark.django_db
+class TestProductView:
+    def test_get_all_products(self, api_client):
+        # Insert data jika sql nanti
+
+        url = reverse('product-url-list')  # pastikan ini sesuai dengan nama path di urls.py
+        response = api_client.get(url)
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.data
+
+        assert data["status"] == "success"
+        assert data["message"] == "GET ALL PRODUCTS"
+        #assert "products" in data["data"]
+        #assert len(data["data"]["products"]) == 2
+        assert len(data["data"]) == 2
+        print(data)
+
+        #names = [p["name"] for p in data["data"]["products"]]
+        names = [p["prod_name"] for p in data["data"]]
+        assert "Product 1" in names
+        assert "Product 2" in names
+    
+
+#Jalankan test
+pytest product
+
+#Jalankan server
+pyhton manage.py runserver
+
+#API DOCS
+http://127.0.0.1:8000/docs/
+
+#DJANGO REST
+http://127.0.0.1:8000/product/
+```
+========================================================================
 
 #### 3.9 Views App CBV (api/views.py)
 
