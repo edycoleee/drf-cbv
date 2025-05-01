@@ -3,7 +3,7 @@
 - Default Router >> list,create,update,destroy
 - Serializer Input dan Output >> validation
 - APIView >> req-validation-proses-response
-- async function, try catch >> get API from others
+- async function, try except >> get API from others
 - Services >> Raw SQL Operation
 - Utils >> db.py, response wrapper, custom exception 
 - drf-spectacular >> extend schema >> schema open api documentation
@@ -712,24 +712,32 @@ http://127.0.0.1:8000/docs/
 #DJANGO REST
 http://127.0.0.1:8000/product/
 ```
-========================================================================
+=======================================================================
+bracnh 02_product >> melanjutkan api product dengan sqlite
+
+Catatan Penting : 
+- SQL pada django >> `cursor.execute("SELECT * FROM tb_products WHERE id = %s", [pk])`
+- Pada unit pytest >> def create_test_table(django_db_setup, django_db_blocker): sebelum seup
+
+#### 3.9 create product Views App CBV (api/views.py)
 
 #### 3.9 Views App CBV (api/views.py)
 
 ```py
+#product/views.py
 from rest_framework import viewsets, status
 from rest_framework.response import Response
-from api.serializers.products_serializer import ProductSerializer
-from api.services.products_service import ProductService
-from api.utils.response_wrapper import success_response
-from api.utils.custom_exception import NotFoundException
-
-from api.schemas.products_schema import (
+from myproject.utils.custom_exception import NotFoundException
+from myproject.utils.response_wrapper import success_response
+from product.serializers import ProductInputSerializer
+from product.services import ProductService
+from product.schemas import (
     product_list_schema,
     product_create_schema,
     product_retrieve_schema,
     product_update_schema,
-    product_delete_schema,
+    product_delete_schema,    
+
 )
 
 class ProductViewSet(viewsets.ViewSet):
@@ -737,46 +745,49 @@ class ProductViewSet(viewsets.ViewSet):
     @product_list_schema
     def list(self, request):
         products = ProductService.get_all_products()
-        return Response(success_response(products))
+        return Response(success_response("GET ALL PRODUCTS",products))
+
 
     @product_retrieve_schema
     def retrieve(self, request, pk=None):
         product = ProductService.get_product_by_id(pk)
         if not product:
             raise NotFoundException('Product not found')
-        return Response(success_response(product))
+        return Response(success_response("GET SINGLE PRODUCT",product))
 
     @product_create_schema
     def create(self, request):
-        serializer = ProductSerializer(data=request.data)
+        serializer = ProductInputSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
-        new_product = ProductService.create_product(data['name'], data['price'])
-        return Response(success_response(new_product), status=status.HTTP_201_CREATED)
+        new_product = ProductService.create_product(data['prod_name'], data['price'])
+        return Response(success_response("ADD NEW PRODUCT",new_product), status=status.HTTP_201_CREATED)
 
     @product_update_schema
     def update(self, request, pk=None):
-        serializer = ProductSerializer(data=request.data)
+        serializer = ProductInputSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
-        updated_product = ProductService.update_product(pk, data['name'], data['price'])
+        updated_product = ProductService.update_product(pk, data['prod_name'], data['price'])
         if not updated_product:
             raise NotFoundException('Product not found')
-        return Response(success_response(updated_product))
+        return Response(success_response("UPDATED PRODUCT",updated_product))
 
     @product_delete_schema
     def destroy(self, request, pk=None):
         deleted = ProductService.delete_product(pk)
         if not deleted:
             raise NotFoundException('Product not found')
-        return Response(success_response({"deleted": True}), status=status.HTTP_204_NO_CONTENT)
+        return Response(success_response("DELETED PRODUCT",{"deleted": True}), status=status.HTTP_204_NO_CONTENT)
 
 ```
 
 #### 3.9 Services App CBV (api/views.py)
 
 ```py
-from api.utils.db import get_cursor_dict
+#product/services.py
+from myproject.utils.db import get_cursor_dict
+
 
 class ProductService:
     @staticmethod
@@ -788,28 +799,28 @@ class ProductService:
     @staticmethod
     def get_product_by_id(product_id):
         with get_cursor_dict() as cursor:
-            cursor.execute("SELECT * FROM tb_products WHERE id = ?", [product_id])
+            cursor.execute("SELECT * FROM tb_products WHERE id = %s", [product_id])
             return cursor.fetchone()
 
     @staticmethod
-    def create_product(name, price):
+    def create_product(prod_name, price):
         with get_cursor_dict() as cursor:
-            cursor.execute("INSERT INTO tb_products (name, price) VALUES (?, ?)", [name, price])
+            cursor.execute("INSERT INTO tb_products (prod_name, price) VALUES (%s, %s)", [prod_name, price])
             new_id = cursor.lastrowid
-            return {"id": new_id, "name": name, "price": price}
+            return {"id": new_id, "prod_name": prod_name, "price": price}
 
     @staticmethod
-    def update_product(product_id, name, price):
+    def update_product(product_id, prod_name, price):
         with get_cursor_dict() as cursor:
-            cursor.execute("UPDATE tb_products SET name = ?, price = ? WHERE id = ?", [name, price, product_id])
+            cursor.execute("UPDATE tb_products SET prod_name = %s, price = %s WHERE id = %s", [prod_name, price, product_id])
             if cursor.rowcount == 0:
                 return None
-            return {"id": int(product_id), "name": name, "price": price}
+            return {"id": int(product_id), "prod_name": prod_name, "price": price}
 
     @staticmethod
     def delete_product(product_id):
         with get_cursor_dict() as cursor:
-            cursor.execute("DELETE FROM tb_products WHERE id = ?", [product_id])
+            cursor.execute("DELETE FROM tb_products WHERE id = %s", [product_id])
             return cursor.rowcount > 0
 
 ```
@@ -817,16 +828,18 @@ class ProductService:
 #### 3.9 Schema App CBV (api/views.py)
 
 ```py
+#product/schemas.py
 from drf_spectacular.utils import extend_schema, OpenApiExample
-from api.serializers.products_serializer import ProductSerializer
+from product.serializers import ProductInputSerializer, ProductOutputSerializer
+
 
 # Example Object (bisa reusable)
 product_example = OpenApiExample(
     'Product Example',
     value={
         "id": 1,
-        "name": "Produk Contoh",
-        "price": 10000.0
+        "prod_name": "Produk Contoh",
+        "price": 10000
     },
     request_only=False,  # tampil di response
     response_only=False, # tampil di request
@@ -835,51 +848,57 @@ product_example = OpenApiExample(
 product_create_example = OpenApiExample(
     'Create Product Example',
     value={
-        "name": "Produk Baru",
-        "price": 15000.0
+        "prod_name": "Produk Baru",
+        "price": 15000
     },
     request_only=True,  # hanya tampil di request body
 )
 
 # List Products
 product_list_schema = extend_schema(
-    responses=ProductSerializer(many=True),
+    responses=ProductOutputSerializer(many=True),
     summary="List all products",
     description="Retrieve a list of all products.",
     examples=[product_example],
+    tags=["Products"],
+    request=None,  # tidak ada request body    
 )
 
 # Create Product
 product_create_schema = extend_schema(
-    request=ProductSerializer,
-    responses=ProductSerializer,
+    request=ProductInputSerializer,
+    responses=ProductOutputSerializer,
     summary="Create a new product",
     description="Create a new product with name and price.",
     examples=[product_create_example, product_example],
+    tags=["Products"],
 )
 
 # Retrieve Product
 product_retrieve_schema = extend_schema(
-    responses=ProductSerializer,
+    responses=ProductOutputSerializer,
     summary="Retrieve a product by ID",
     description="Retrieve product details by its ID.",
     examples=[product_example],
+    tags=["Products"],
 )
 
 # Update Product
 product_update_schema = extend_schema(
-    request=ProductSerializer,
-    responses=ProductSerializer,
+    request=ProductInputSerializer,
+    responses=ProductOutputSerializer,
     summary="Update a product by ID",
     description="Update an existing product by its ID.",
     examples=[product_create_example, product_example],
+    tags=["Products"],
 )
 
 # Delete Product
 product_delete_schema = extend_schema(
     responses=None,
     summary="Delete a product by ID",
-    description="Delete an existing product by its ID."
+    description="Delete an existing product by its ID.",
+    tags=["Products"],
 )
 
 ```
@@ -887,39 +906,84 @@ product_delete_schema = extend_schema(
 #### 3.10 Unit Test (api/test_api.py) pakai pytest-drf
 
 ```py
+# product/tests.py
+from django.db import connection
 import pytest
-from pytest_drf import APIClientFixture, ViewSetTest
-from pytest_drf.util import url_for
+from django.urls import reverse
+from rest_framework import status
+from rest_framework.test import APIClient
 
-client = APIClientFixture()
+# === Fixtures ===
+@pytest.fixture(scope="session", autouse=True)
+def create_test_table(django_db_setup, django_db_blocker):
+    with django_db_blocker.unblock():
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS tb_products (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    prod_name TEXT NOT NULL,
+                    price REAL NOT NULL
+                )
+            """)
 
+@pytest.fixture
+def api_client():
+    return APIClient()
+
+@pytest.fixture
+def setup_products():
+    with connection.cursor() as cursor:
+        cursor.execute("INSERT INTO tb_products ( prod_name, price) VALUES ('macbook', 100)")
+        cursor.execute("INSERT INTO tb_products ( prod_name, price) VALUES ('surface', 200)")
+    yield
+    with connection.cursor() as cursor:
+        cursor.execute("DELETE FROM tb_products")
+        cursor.execute("DELETE FROM sqlite_sequence WHERE name='tb_products'")  # reset autoincrement
+        
+
+# === Test Class ===
 @pytest.mark.django_db
-class TestProductViewSet(ViewSetTest):
-    client = client
+class TestProductView:
 
-    def test_create_product(self):
-        data = {"name": "Produk A", "price": 10000}
-        response = self.client.post(url_for('products-list'), data, format='json')
-        assert response.status_code == 201
-        assert response.data['data']['name'] == "Produk A"
+    def test_get_all_products(self, api_client, setup_products):
+        url = reverse('product-url-list')
+        response = api_client.get(url)
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data["status"] == "success"
+        names = [p["prod_name"] for p in response.data["data"]]
+        assert "macbook" in names and "surface" in names
 
-    def test_list_products(self):
-        response = self.client.get(url_for('products-list'))
-        assert response.status_code == 200
-        assert 'data' in response.data
+    def test_get_single_product(self, api_client, setup_products):
+        url = reverse('product-url-detail', args=[1])
+        response = api_client.get(url)
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data["data"]["prod_name"] == "macbook"
 
-    def test_get_product_not_found(self):
-        response = self.client.get(url_for('products-detail', pk=9999))
-        assert response.status_code == 404
+    def test_create_product(self, api_client):
+        url = reverse('product-url-list')
+        payload = {"prod_name": "New Product", "price": 15.5}
+        response = api_client.post(url, data=payload, format="json")
+        assert response.status_code == status.HTTP_201_CREATED
+        assert response.data["data"]["prod_name"] == "New Product"
 
-    def test_update_product_not_found(self):
-        data = {"name": "Produk X", "price": 20000}
-        response = self.client.put(url_for('products-detail', pk=9999), data, format='json')
-        assert response.status_code == 404
+    def test_update_product(self, api_client, setup_products):
+        url = reverse('product-url-detail', args=[1])
+        payload = {"prod_name": "Updated Product", "price": 99.9}
+        response = api_client.put(url, data=payload, format="json")
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data["data"]["prod_name"] == "Updated Product"
 
-    def test_delete_product_not_found(self):
-        response = self.client.delete(url_for('products-detail', pk=9999))
-        assert response.status_code == 404
+    def test_delete_product(self, api_client, setup_products):
+        url = reverse('product-url-detail', args=[1])
+        response = api_client.delete(url)
+        assert response.status_code == status.HTTP_204_NO_CONTENT
+
+    def test_create_product_invalid_name(self, api_client):
+        url = reverse('product-url-list')
+        payload = {"prod_name": "", "price": 10.0}
+        response = api_client.post(url, data=payload, format="json")
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "prod_name" in response.data
 
 ```
 
