@@ -13,8 +13,11 @@ from product.schemas import (
     product_delete_schema,    
 
 )
+from rest_framework.permissions import IsAuthenticated
 
 class ProductViewSet(viewsets.ViewSet):
+    
+    permission_classes = [IsAuthenticated]
 
     @product_list_schema
     def list(self, request):

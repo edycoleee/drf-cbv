@@ -991,6 +991,320 @@ class TestProductView:
 
 ### 4. AUTH JWT >> login untuk crud api product
 
+```py
+pip install djangorestframework-simplejwt
+python manage.py migrate
+python manage.py runserver
+
+#buat folder auth
+```
+#### 1. settings.py
+
+```py
+INSTALLED_APPS = [
+    'django.contrib.admin',
+    'django.contrib.auth',
+    'django.contrib.contenttypes',
+    'django.contrib.sessions',
+    'django.contrib.messages',
+    'django.contrib.staticfiles',
+    'rest_framework',
+    'drf_spectacular',
+    'belajar',  # tambahkan app
+    'product',  # tambahkan app
+    'rest_framework_simplejwt', #auth jwt
+]
+
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+    ),
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+    'TEST_REQUEST_DEFAULT_FORMAT': 'json',
+    'TEST_REQUEST_RENDERER_CLASSES': [
+        'rest_framework.renderers.JSONRenderer',
+    ],
+}
+
+from datetime import timedelta
+
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(days=1),
+    'AUTH_HEADER_TYPES': ('Bearer',),
+}
+```
+#### 2. serializers
+
+```py
+#auth/serializers.py
+from rest_framework import serializers
+from django.contrib.auth.models import User
+
+class RegisterSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ('username', 'password')
+        extra_kwargs = {'password': {'write_only': True}}
+
+class UpdatePasswordSerializer(serializers.Serializer):
+    new_password = serializers.CharField(write_only=True, min_length=6)
+
+class UserOutputSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ('id', 'username')
+```
+
+#### 3. schema
+
+```py
+from drf_spectacular.utils import extend_schema, OpenApiResponse, OpenApiExample, OpenApiParameter
+from auth.serializers import (
+    RegisterSerializer,
+    UpdatePasswordSerializer,
+    UserOutputSerializer
+)
+
+register_schema = extend_schema(
+    request=RegisterSerializer,
+    responses={201: UserOutputSerializer},
+    examples=[
+        OpenApiExample(
+            "Register Example",
+            value={"username": "user1", "password": "123456"},
+        )
+    ],
+    description="Register a new user.",
+)
+
+update_password_schema = extend_schema(
+    request=UpdatePasswordSerializer,
+    responses={200: OpenApiResponse(description="Password updated")},
+    examples=[
+        OpenApiExample(
+            "Update Password Example",
+            value={"new_password": "newpass123"},
+        )
+    ],
+    description="Update password. Requires authentication.",
+    parameters=[
+        OpenApiParameter(
+            name='Authorization',
+            type=str,
+            location=OpenApiParameter.HEADER,
+            required=True,
+            description='JWT access token. Format: Bearer <access_token>'
+        )
+    ]
+)
+
+logout_schema = extend_schema(
+    responses={200: OpenApiResponse(description="Logout successful")},
+    description="Logout current user. Requires authentication.",
+    parameters=[
+        OpenApiParameter(
+            name='Authorization',
+            type=str,
+            location=OpenApiParameter.HEADER,
+            required=True,
+            description='JWT access token. Format: Bearer <access_token>'
+        )
+    ]
+)
+
+```
+
+#### 4. views
+
+```py
+
+from rest_framework.views import APIView
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from rest_framework import status
+from django.contrib.auth.models import User
+from auth.serializers import (
+    RegisterSerializer,
+    UpdatePasswordSerializer,
+    UserOutputSerializer
+)
+from auth.schemas import register_schema, update_password_schema, logout_schema
+
+
+class RegisterView(APIView):
+    @register_schema
+    def post(self, request):
+        serializer = RegisterSerializer(data=request.data)
+        if serializer.is_valid():
+            user = User.objects.create_user(
+                username=serializer.validated_data["username"],
+                password=serializer.validated_data["password"]
+            )
+            return Response(UserOutputSerializer(user).data, status=201)
+        return Response(serializer.errors, status=400)
+
+class LogoutView(APIView):
+    permission_classes = [IsAuthenticated]
+    @logout_schema
+    def post(self, request):
+        return Response({"message": "Logout successful"}, status=200)
+
+class UpdatePasswordView(APIView):
+    permission_classes = [IsAuthenticated]
+    @update_password_schema
+    def post(self, request):
+        serializer = UpdatePasswordSerializer(data=request.data)
+        if serializer.is_valid():
+            request.user.set_password(serializer.validated_data["new_password"])
+            request.user.save()
+            return Response({"message": "Password updated"}, status=200)
+        return Response(serializer.errors, status=400)
+
+
+#product/views.py
+from rest_framework import viewsets, status
+from rest_framework.response import Response
+from myproject.utils.custom_exception import NotFoundException
+from myproject.utils.response_wrapper import success_response
+from product.serializers import ProductInputSerializer
+from product.services import ProductService
+from product.schemas import (
+    product_list_schema,
+    product_create_schema,
+    product_retrieve_schema,
+    product_update_schema,
+    product_delete_schema,    
+
+)
+from rest_framework.permissions import IsAuthenticated
+
+class ProductViewSet(viewsets.ViewSet):
+    
+    permission_classes = [IsAuthenticated]
+
+    @product_list_schema
+    def list(self, request):
+        products = ProductService.get_all_products()
+        return Response(success_response("GET ALL PRODUCTS",products))
+
+
+```
+
+#### 5. urls >> auth
+
+```py
+from django.urls import path
+from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
+from auth.views import LogoutView, RegisterView, UpdatePasswordView
+
+
+urlpatterns = [
+    path("register/", RegisterView.as_view(), name="register"),
+    path("login/", TokenObtainPairView.as_view(), name="token_obtain_pair"),
+    path("token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
+    path("logout/", LogoutView.as_view(), name="logout"),
+    path("update-password/", UpdatePasswordView.as_view(), name="update_password"),
+]
+
+```
+
+#### 6. urls >> utama (myapps)
+
+```py
+from django.contrib import admin
+from django.urls import path, include
+from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
+
+urlpatterns = [
+    path('admin/', admin.site.urls),
+    path('', include('belajar.urls')),  # include url dari app belajar
+    path('', include('product.urls')),  # include url dari app products
+    path('auth/', include('auth.urls')),
+    path('schema/', SpectacularAPIView.as_view(), name='schema'),  # openapi schema
+    path('docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),  # swagger ui
+]
+```
+
+#### 7. tests.py
+
+```py
+import pytest
+from django.urls import reverse
+from rest_framework.test import APIClient
+from django.contrib.auth.models import User
+
+client = APIClient()
+
+import pytest
+from django.urls import reverse
+from rest_framework.test import APIClient
+from django.contrib.auth.models import User
+
+client = APIClient()
+
+@pytest.mark.django_db
+def test_register_user():
+    response = client.post(reverse("register"), {"username": "testuser", "password": "testpass"})
+    assert response.status_code == 201
+    assert response.data["username"] == "testuser"
+
+@pytest.mark.django_db
+def test_login_user():
+    User.objects.create_user(username="testuser", password="testpass")
+    response = client.post(reverse("token_obtain_pair"), {"username": "testuser", "password": "testpass"})
+    assert response.status_code == 200
+    assert "access" in response.data
+    assert "refresh" in response.data
+
+@pytest.mark.django_db
+def test_update_password():
+    user = User.objects.create_user(username="testuser", password="testpass")
+    login = client.post(reverse("token_obtain_pair"), {"username": "testuser", "password": "testpass"})
+    token = login.data["access"]
+
+    client.credentials(HTTP_AUTHORIZATION=f"Bearer {token}")
+    response = client.post(reverse("update_password"), {"new_password": "newpass123"})
+    assert response.status_code == 200
+    assert response.data["message"] == "Password updated"
+
+    # Test login with new password
+    client.credentials()  # clear token
+    login2 = client.post(reverse("token_obtain_pair"), {"username": "testuser", "password": "newpass123"})
+    assert login2.status_code == 200
+    assert "access" in login2.data
+
+@pytest.mark.django_db
+def test_logout_user():
+    user = User.objects.create_user(username="testuser", password="testpass")
+    login = client.post(reverse("token_obtain_pair"), {"username": "testuser", "password": "testpass"})
+    token = login.data["access"]
+
+    client.credentials(HTTP_AUTHORIZATION=f"Bearer {token}")
+    response = client.post(reverse("logout"))
+    assert response.status_code == 200
+    assert response.data["message"] == "Logout successful"
+
+@pytest.mark.django_db
+def test_login_wrong_password():
+    User.objects.create_user(username="testuser", password="testpass")
+    response = client.post(reverse("token_obtain_pair"), {"username": "testuser", "password": "wrongpass"})
+    assert response.status_code == 401
+    assert "access" not in response.data
+
+# @pytest.mark.django_db
+# def test_protected_product_access():
+#     user = User.objects.create_user(username="testuser", password="testpass")
+#     login = client.post(reverse("token_obtain_pair"), {"username": "testuser", "password": "testpass"})
+#     token = login.data["access"]
+#     client.credentials(HTTP_AUTHORIZATION=f"Bearer {token}")
+
+#     url = reverse("product-list")  # pastikan pakai nama URL yang sesuai
+#     response = client.get(url)
+#     assert response.status_code == 200
+
+```
+
+
 ### 5. ROLE BASE >> login untuk crud api product + userid
 
 ### 6. ONE TO ONE
