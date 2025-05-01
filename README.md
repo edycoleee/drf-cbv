@@ -9,6 +9,14 @@
 - drf-spectacular >> extend schema >> schema open api documentation
 - pytest-django >> unit test terstruktur
 - docker >> deploy server
+- auth >> jwt
+- role base >> user
+- sql realation >> one to one, one to many, many to many
+- sql atomic and rollback
+- nosql database
+- postgree database
+
+
 
 ### 1. GITHUB
 
